@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Мои точки продаж{% endblock %}
+
+{% block content %}
+    <h2 class="mb-4">Создание точки продажи</h2>
+    <form method="POST" action="{{ url_for('web.myplaces') }}">
+        <div class="mb-3">
+            <label for="address" class="form-label">Адрес</label>
+            <input type="text" class="form-control" id="address" name="address" placeholder="Введите адрес" required>
+        </div>
+        <div class="mb-3">
+            <label for="adminName" class="form-label">Имя администратора</label>
+            <input type="text" class="form-control" id="adminName" name="admin_name" placeholder="Введите имя администратора" required>
+        </div>
+        <div class="mb-3">
+            <label for="adminPhone" class="form-label">Телефон администратора</label>
+            <input type="tel" class="form-control" id="adminPhone" name="admin_phone" placeholder="Введите телефон" required>
+        </div>
+        <button type="submit" class="btn btn-success">Создать</button>
+    </form>
+
+    <h3 class="mt-5">Ваши точки продаж</h3>
+    {% if places %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Адрес</th>
+                    <th>Имя администратора</th>
+                    <th>Телефон администратора</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for place in places %}
+                    <tr>
+                        <td>{{ place.address }}</td>
+                        <td>{{ place.admin_name }}</td>
+                        <td>{{ place.admin_phone }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('web.delete_place', place_id=place.id) }}">
+                                <button type="submit" class="btn btn-danger">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>У вас нет добавленных точек продаж.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Profile</h2>
+    <form method="POST" action="{{ url_for('web.profile') }}">
+        <div class="mb-3">
+            <label for="companyName" class="form-label">Название компании</label>
+            <input type="text" class="form-control" id="companyName" name="company_name" 
+                   value="{{ current_user.company_name }}" readonly>
+        </div>
+    </form>
+
+    <a href="{{ telegram_link }}" class="btn btn-primary mt-3" target="_blank">Привязать аккаунт Telegram</a>
+
+    <!-- Переключатели уведомлений -->
+    <div class="mb-3">
+        <label class="form-label">Уведомления</label>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="telegramNotifications" name="telegram_notifications" 
+                   {% if current_user.telegram_notifications %}checked{% endif %}>
+            <label class="form-check-label" for="telegramNotifications">Telegram</label>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="smsNotifications" name="sms_notifications" 
+                   {% if current_user.sms_notifications %}checked{% endif %}>
+            <label class="form-check-label" for="smsNotifications">SMS</label>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="emailNotifications" name="email_notifications" 
+                   {% if current_user.email_notifications %}checked{% endif %}>
+            <label class="form-check-label" for="emailNotifications">Email</label>
+        </div>
+    </div>
+
+    <div class="d-flex gap-3">
+        <button type="submit" class="btn btn-primary mt-3">Сохранить изменения</button>
+    </div>
+    <div class="d-flex gap-3">
+        <button type="submit" class="btn btn-primary mt-3">Сменить пароль</button>
+    </div>
+    <input type="text" class="form-control mt-3" id="companyName" name="company_name" 
+        value="Старый пароль" readonly>
+    <input type="text" class="form-control mt-3" id="companyName" name="company_name" 
+        value="Новый пароль" readonly>
+
+    
+</div>
+<!-- Добавляем виджет Telegram Login на страницу -->
+<script async src="https://telegram.org/js/telegram-widget.js?22"
+        data-telegram-login="@test_tt_irk_bot" 
+        data-size="large" 
+        data-onauth="onTelegramAuth(user)"
+        data-request-access="write"></script>
+
+<script type="text/javascript">
+    // Функция, которая будет вызвана после успешной авторизации пользователя через Telegram
+    function onTelegramAuth(user) {
+        // В user содержатся данные пользователя, например:
+        // user.id - ID пользователя в Telegram
+        // user.first_name - имя пользователя в Telegram
+        // user.username - юзернейм пользователя, если он есть
+        // user.last_name - фамилия пользователя, если она есть
+
+        // Теперь нужно отправить эти данные на сервер для привязки аккаунта
+        fetch('/link_telegram_account', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                telegram_id: user.id, // ID пользователя в Telegram
+                first_name: user.first_name, // Имя пользователя в Telegram
+                last_name: user.last_name, // Фамилия пользователя в Telegram
+                username: user.username // Юзернейм пользователя в Telegram
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Вы можете отобразить успешное сообщение или сделать редирект
+            if (data.success) {
+                alert('Telegram аккаунт привязан успешно');
+            } else {
+                alert('Ошибка привязки');
+            }
+        });
+    }
+</script>
+{% endblock %}

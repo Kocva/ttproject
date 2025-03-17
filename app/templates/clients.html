@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Клиенты{% endblock %}
+
+{% block content %}
+<h1>Клиенты</h1>
+
+<ul class="list-group">
+    {% for client in clients %}
+        <li class="list-group-item" id="client-{{ client.id }}">
+            <h5>{{ client.company_name }}</h5>
+            <p>Администратор: {{ client.admin_name }} ({{ client.admin_phone }})</p>
+
+            <!-- Кнопка для просмотра точек -->
+            <button class="btn btn-info" onclick="viewPlaces({{ client.id }})">Просмотреть точки</button>
+
+            <!-- Список точек для клиента -->
+            <div id="places-{{ client.id }}" class="mt-3" style="display: none;">
+                <ul class="list-group">
+                    <!-- Точки продаж будут добавляться сюда через JS -->
+                </ul>
+            </div>
+        </li>
+    {% endfor %}
+</ul>
+
+{% if current_user.role == 'director' %}
+<h2 class="mt-5">Добавить клиента</h2>
+<form method="post">
+    <div class="mb-3">
+        <label for="company_name">Название компании:</label>
+        <input type="text" id="company_name" name="company_name" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="username">Имя пользователя:</label>
+        <input type="text" id="username" name="username" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" class="form-control">
+    </div>
+    <button type="button" class="btn btn-primary" onclick="addClient()">Добавить клиента</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function addClient() {
+        const company_name = document.getElementById('company_name').value;
+        const password = document.getElementById('password').value;
+        const username = document.getElementById('username').value;
+
+        const response = await fetch('/api/client', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                company_name,
+                password,
+                username
+            })
+        });
+        if (response.ok) {
+            alert('Клиент добавлен!');
+            // Возможно, функция для обновления списка клиентов
+            getClients();
+        }
+    }
+
+    async function viewPlaces(clientId) {
+        const placesList = document.getElementById('places-' + clientId);
+        const response = await fetch(`/api/places/${clientId}`);
+
+        if (response.ok) {
+            const places = await response.json();
+            const placesContainer = placesList.querySelector('ul');
+            placesContainer.innerHTML = '';  // Очищаем список точек
+
+            if (places.length > 0) {
+                places.forEach(place => {
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('list-group-item');
+                    listItem.textContent = `Адрес: ${place.address}, Администратор: ${place.admin_name}, Телефон: ${place.admin_phone}`;
+                    placesContainer.appendChild(listItem);
+                });
+                placesList.style.display = 'block'; // Показываем блок с точками
+            } else {
+                const noPlacesItem = document.createElement('li');
+                noPlacesItem.classList.add('list-group-item');
+                noPlacesItem.textContent = 'Нет точек продаж для этого клиента.';
+                placesContainer.appendChild(noPlacesItem);
+                placesList.style.display = 'block'; // Показываем блок с точками
+            }
+        } else {
+            alert('Ошибка при получении точек!');
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Добавить клиента</h2>
+<form method="post">
+    <div class="mb-3">
+        <label for="company_name">Название компании:</label>
+        <input type="text" id="company_name" name="company_name" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="admin_name">Имя администратора:</label>
+        <input type="text" id="admin_name" name="admin_name" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="admin_phone">Телефон администратора:</label>
+        <input type="text" id="admin_phone" name="admin_phone" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="address">Адрес:</label>
+        <input type="text" id="address" name="address" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="additional_admin">Дополнительный администратор:</label>
+        <input type="text" id="additional_admin" name="additional_admin" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Добавить клиента</button>
+</form>
+{% endblock %}

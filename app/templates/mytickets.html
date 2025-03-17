@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Заявки{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Система заявок</h1>
+
+    <div class="mb-3">
+        <h2>Создать новую заявку</h2>
+        <form id="ticket-form">
+            <div class="mb-3">
+                <input type="text" id="title" class="form-control" placeholder="Заголовок">
+            </div>
+            <div class="mb-3">
+                <input type="text" id="description" class="form-control" placeholder="Опишите проблему">
+            </div>
+            <div class="mb-3">
+                <select id="sales-point" class="form-control">
+                    <option value="">Выберите точку продаж</option>
+                    {% for place in places %}
+                        <option value="{{ place.id }}">{{ place.address }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="button" class="btn btn-primary" onclick="createTicket()">Создать заявку</button>
+        </form>
+    </div>
+
+    <div class="mb-4">
+        <h2>Список заявок</h2>
+        <ul id="ticket-list" class="list-group"></ul>
+    </div>
+    <input type="hidden" id="user-id" value="{{ user_id }}">
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function getTickets() {
+        let url = `/api/tickets`;
+
+        const response = await fetch(url);
+        const tickets = await response.json();
+        const ticketList = document.getElementById('ticket-list');
+        ticketList.innerHTML = '';
+
+        tickets.forEach(ticket => {
+            ticketList.innerHTML += `
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>${ticket.title}</strong> - <strong>Статус:</strong> ${ticket.status}</span>
+                        <div>
+                            <button class="btn btn-sm btn-warning me-2" onclick="editTicket(${ticket.id})">Изменить</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTicket(${ticket.id})">Удалить</button>
+                        </div>
+                    </div>
+                    <p><strong>Описание:</strong> ${ticket.description}</p>
+                    <p><strong>Ответственный сотрудник:</strong> ${ticket.employee_name}</p>
+                    <p><strong>Компания:</strong> ${ticket.company_name}</p>
+                    <p><strong>Точка продаж:</strong> ${ticket.place_address || 'Не указано'}</p>
+                    <small class="text-muted">Создано: ${new Date(ticket.created_at).toLocaleString()}</small>
+                    <div id="edit-form-${ticket.id}" class="mt-3" style="display: none;">
+                        <input type="text" class="form-control mb-2" id="edit-title-${ticket.id}" value="${ticket.title}" placeholder="Название">
+                        <input type="text" class="form-control mb-2" id="edit-description-${ticket.id}" value="${ticket.description}" placeholder="Описание">
+                        
+                        <button class="btn btn-sm btn-primary" onclick="saveChanges(${ticket.id})">Сохранить</button>
+                        <button class="btn btn-sm btn-secondary" onclick="cancelEdit(${ticket.id})">Отмена</button>
+                    </div>
+                </li>
+            `;
+        });
+    }
+
+    function editTicket(id) {
+        const editForm = document.getElementById(`edit-form-${id}`);
+        editForm.style.display = 'block';
+    }
+
+    function cancelEdit(id) {
+        const editForm = document.getElementById(`edit-form-${id}`);
+        editForm.style.display = 'none';
+    }
+
+    async function saveChanges(id) {
+        const title = document.getElementById(`edit-title-${id}`).value;
+        const description = document.getElementById(`edit-description-${id}`).value;
+
+        const response = await fetch(`/api/tickets/${id}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, description })
+        });
+
+        if (response.ok) {
+            alert('Заявка обновлена!');
+            getTickets();
+        }
+    }
+
+    async function createTicket() {
+        const title = document.getElementById('title').value;
+        const description = document.getElementById('description').value;
+        const placeId = document.getElementById('sales-point').value;  // Получаем выбранную точку продаж
+        const source = "site";
+        const employeeId = "1";  // Можно заменить на динамическое значение
+        const clientId = document.getElementById('user-id').value;
+
+        const response = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title,
+                description,
+                source,
+                employee_id: employeeId,
+                client_id: clientId,
+                place_id: placeId  // Передаем идентификатор точки продаж
+            })
+        });
+
+        if (response.ok) {
+            alert('Заявка создана!');
+            getTickets();
+        }
+    }
+
+    async function deleteTicket(id) {
+        const response = await fetch(`/api/tickets/${id}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            alert('Заявка удалена!');
+            getTickets();
+        }
+    }
+
+    window.onload = getTickets;
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Платежи{% endblock %}
+
+{% block content %}
+<h1>Платежи</h1>
+
+<form method="POST" action="/create_payment">
+    <div class="mb-3">
+        <label>Компания:</label>
+        <select class="form-select">
+            {% for client in clients %}
+                <option value="{{ client.id }}">{{ client.company_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>Заявка:</label>
+        <select class="form-select">
+            {% for ticket in tickets %}
+                <option value="{{ ticket.id }}">{{ ticket.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>Сумма:</label>
+        <input type="number" class="form-control" name="amount">
+    </div>
+    <button type="submit" class="btn btn-primary">Создать платеж</button>
+</form>
+{% endblock %}

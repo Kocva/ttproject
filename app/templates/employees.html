@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Сотрудники{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Сотрудники</h1>
+<div id="employee-list" class="row row-cols-1 row-cols-md-2 g-4"></div>
+
+{% if current_user.role == 'директор' %}
+<h2 class="mt-5">Добавить сотрудника</h2>
+<form method="post">
+    <div class="mb-3">
+        <label for="name">ФИО:</label>
+        <input type="text" id="name" name="name" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="username">Логин:</label>
+        <input type="text" id="username" name="username" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="role">роль:</label>
+        <input type="text" id="role" name="role" class="form-control">
+    </div>
+    <button type="button" class="btn btn-primary" onclick="addEmployee()">Добавить сотрудника</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function getEmployees() {
+        const url = `/api/employee`;
+        const response = await fetch(url);
+        const employees = await response.json();
+        const employeeList = document.getElementById('employee-list');
+        const currentUserRole = "{{ currentUserRole }}";
+        employeeList.innerHTML = '';
+
+        employees.forEach(employee => {
+            let deleteButton = '';
+            let editButton = '';
+            if (currentUserRole === 'director' || currentUserRole === 'директор') {
+            deleteButton = `
+            <button class="btn btn-sm btn-danger mb-1" onclick="deleteEmployee(${employee.id})">
+                Удалить
+            </button>
+            `;
+            editButton = `
+                <button class="btn btn-sm btn-warning mb-1" onclick="editEmployee(${employee.id})">
+                    Изменить
+                </button>
+            `;
+        }
+
+            employeeList.innerHTML += `
+                <div class="col">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title"> ${employee.name}</h5>
+                            <p class="card-text"><strong>Должность:</strong> ${employee.role}</p>
+                            <div class="position-absolute top-0 end-0 p-2 d-flex flex-column">
+                                ${editButton}
+                                ${deleteButton}
+                            </div>
+                            <div id="edit-form-${employee.id}" class="mt-3" style="display: none;">
+                                <input type="text" class="form-control mb-2" id="edit-name-${employee.id}" value="${employee.name}" placeholder="Имя">
+                                <input type="text" class="form-control mb-2" id="edit-role-${employee.id}" value="${employee.role}" placeholder="Роль">
+                                <button class="btn btn-sm btn-primary" onclick="saveChanges(${employee.id})">Сохранить</button>
+                                <button class="btn btn-sm btn-secondary" onclick="cancelEdit(${employee.id})">Отмена</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    async function addEmployee() {
+        const name = document.getElementById('name').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const telegram = document.getElementById('telegram').value;
+        const role = document.getElementById('role').value;
+
+        const response = await fetch('/api/employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, username, password, role, telegram})
+        });
+        if (response.ok) {
+            alert('сотрудник добавлен!');
+            getEmployees();
+        }
+    }
+
+    async function deleteEmployee(id) {
+        const response = await fetch(`/api/employee/${id}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            alert('Сотрудник удалён!');
+            getEmployees();
+        }
+    }
+    function editEmployee(id) {
+        const editForm = document.getElementById(`edit-form-${id}`);
+        editForm.style.display = 'block';
+    }
+
+    function cancelEdit(id) {
+        const editForm = document.getElementById(`edit-form-${id}`);
+        editForm.style.display = 'none';
+    }
+
+    async function saveChanges(id) {
+        const name = document.getElementById(`edit-name-${id}`).value;
+        const role = document.getElementById(`edit-role-${id}`).value;
+
+        const response = await fetch(`/api/employee/${id}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, role })
+        });
+
+        if (response.ok) {
+            alert('Данные сотрудника обновлены!');
+            getEmployees();
+        }
+    }
+
+    window.onload = getEmployees;
+</script>
+{% endblock %}

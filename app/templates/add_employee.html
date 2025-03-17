@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Добавить сотрудника</h2>
+<form method="post">
+    <div class="mb-3">
+        <label for="name">ФИО:</label>
+        <input type="text" id="name" name="name" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="username">Логин:</label>
+        <input type="text" id="username" name="username" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" class="form-control">
+    </div>
+    <button type="button" class="btn btn-primary" onclick="createEmployee()">Добавить сотрудника</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    
+
+    async function createEmployee() {
+        const name = document.getElementById('name').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const response = await fetch('/api/add_employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, username, password})
+        });
+        if (response.ok) {
+            alert('сотрудник создан!');
+            getTickets();
+        }
+    }
+
+    //window.onload = getEmployee;
+</script>
+{% endblock %}
