@@ -12,6 +12,15 @@
                 <input type="text" id="title" class="form-control" placeholder="Заголовок">
             </div>
             <div class="mb-3">
+                <select id="problem-select" class="form-control" onchange="toggleDescription()">
+                    <option value="">Выберите проблему</option>
+                    <option value="Ошибка системы">Ошибка системы</option>
+                    <option value="Не работает касса">Не работает касса</option>
+                    <option value="Нет доступа">Нет доступа</option>
+                    <option value="Другое">Другое</option>
+                </select>
+            </div>
+            <div class="mb-3" id="description-container" style="display: none;">
                 <input type="text" id="description" class="form-control" placeholder="Опишите проблему">
             </div>
             <div class="mb-3">
@@ -55,7 +64,7 @@
                         </div>
                     </div>
                     <p><strong>Описание:</strong> ${ticket.description}</p>
-                    <p><strong>Ответственный сотрудник:</strong> ${ticket.employee_name}</p>
+                    <p><strong>Ответственный сотрудник:</strong> ${ticket.employee_name ? ticket.employee_name : 'Не назначен'}</p>
                     <p><strong>Компания:</strong> ${ticket.company_name}</p>
                     <p><strong>Точка продаж:</strong> ${ticket.place_address || 'Не указано'}</p>
                     <small class="text-muted">Создано: ${new Date(ticket.created_at).toLocaleString()}</small>
@@ -99,12 +108,24 @@
         }
     }
 
+    function toggleDescription() {
+        const problemSelect = document.getElementById('problem-select');
+        const descriptionContainer = document.getElementById('description-container');
+        if (problemSelect.value === 'Другое') {
+            descriptionContainer.style.display = 'block';
+        } else {
+            descriptionContainer.style.display = 'none';
+        }
+    }
+
     async function createTicket() {
         const title = document.getElementById('title').value;
-        const description = document.getElementById('description').value;
+        const problemSelect = document.getElementById('problem-select').value;
+        const description = problemSelect === 'Другое' ? document.getElementById('description').value : problemSelect;
         const placeId = document.getElementById('sales-point').value;  // Получаем выбранную точку продаж
         const source = "site";
-        const employeeId = "1";  // Можно заменить на динамическое значение
+        const status = "Новая";
+        const employeeId = "";  // Можно заменить на динамическое значение
         const clientId = document.getElementById('user-id').value;
 
         const response = await fetch('/api/tickets', {
@@ -116,6 +137,7 @@
                 title,
                 description,
                 source,
+                status,
                 employee_id: employeeId,
                 client_id: clientId,
                 place_id: placeId  // Передаем идентификатор точки продаж

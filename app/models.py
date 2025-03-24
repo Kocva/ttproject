@@ -12,6 +12,8 @@ class Ticket(db.Model):
     status = db.Column(db.String(50), nullable=False, default='Новая')
     source = db.Column(db.String(50), nullable=False)  # 'email', 'site', 'manual'
     created_at = db.Column(db.String(50), default=datetime.datetime.now().strftime('%m/%d/%y %H:%M:%S'))
+    started_at = db.Column(db.String(50))  # Дата взятия в работу
+    completed_at = db.Column(db.String(50))  # Дата завершения
     type = db.Column(db.String(50), nullable=True)
     client_id = db.Column(db.Integer, db.ForeignKey('clients.id'))
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'))

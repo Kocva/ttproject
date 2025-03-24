@@ -219,7 +219,8 @@ async def select_place(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'title': context.user_data['title'],
         'description': context.user_data['description'],
         'source': "Телеграм-бот",
-        'employee_id': context.user_data['employee_id'] if 'employee_id' in context.user_data else 1,  # Если сотрудник
+        'status': "В работе" if 'employee_id' in context.user_data else "Новая",
+        'employee_id': context.user_data['employee_id'] if 'employee_id' in context.user_data else '',  # Если сотрудник
         'client_id': client_id,
         'place_id': place_id  # Добавляем ID точки продаж
     }

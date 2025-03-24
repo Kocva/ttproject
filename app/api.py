@@ -4,13 +4,13 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 import datetime
 import requests
-
+from sqlalchemy import case
 from flask import render_template, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import db, Employee, Ticket, Client, Places  # импорт моделей
 import os
-
+from sqlalchemy.orm import joinedload
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 TELEGRAM_BOT_TOKEN = "7506782496:AAFa49IjW1q3wrO1e5L4QGmDpgVILI3vvq0"
@@ -125,20 +125,43 @@ def delete_employee(id):
 
 
 # Получение всех заявок
-@api_bp.route('/tickets', methods=['GET'])
+@api_bp.route('/tickets', methods=['GET']) 
 def get_tickets():
     try:
-        tickets = Ticket.query.join(Employee, Ticket.employee_id == Employee.id, isouter=True) \
-                              .join(Client, Ticket.client_id == Client.id, isouter=True) \
-                              .join(Places, Ticket.place_id == Places.id, isouter=True) \
-                              .add_columns(
-                                  Ticket.id, Ticket.title, Ticket.description, Ticket.status, Ticket.created_at,
-                                  Employee.name.label('employee_name'), 
-                                  Client.company_name.label('company_name'),
-                                  Places.address.label('place_address')  # Добавляем address из таблицы Places
-                              ) \
-                              .all()
+        filter_status = request.args.get('filter', 'all')
+        current_employee_id = current_user  # Функция для получения текущего ID сотрудника
         
+        query = Ticket.query.join(Employee, Ticket.employee_id == Employee.id, isouter=True) \
+                            .join(Client, Ticket.client_id == Client.id, isouter=True) \
+                            .join(Places, Ticket.place_id == Places.id, isouter=True) \
+                            .add_columns(
+                                Ticket.id, Ticket.title, Ticket.description, Ticket.status, Ticket.created_at, 
+                                Ticket.started_at, Ticket.completed_at,
+                                Employee.name.label('employee_name'), 
+                                Client.company_name.label('company_name'),
+                                Places.address.label('place_address')
+                            ) \
+                            .order_by(
+                                case(
+                                    (Ticket.status == "Новая", 1),
+                                    (Ticket.status == "В работе", 2),
+                                    (Ticket.status == "Завершенная", 3),
+                                    else_=4  # Если появятся другие статусы
+                                ).asc()  # Сортировка по возрастанию (Новая -> В работе -> Завершенная)
+                            )
+                                
+        
+        # Фильтрация по статусу
+        if filter_status == 'new':
+            query = query.filter(Ticket.status == 'Новая')
+        elif filter_status == 'in_progress':
+            query = query.filter(Ticket.status == 'В работе')
+        elif filter_status == 'completed':
+            today = datetime.date.today()
+            query = query.filter(Ticket.status == 'Завершенная')
+
+        tickets = query.all()
+
         result = [{
             'id': ticket.id,
             'title': ticket.title,
@@ -146,15 +169,18 @@ def get_tickets():
             'status': ticket.status,
             'employee_name': ticket.employee_name,
             'company_name': ticket.company_name,
-            'place_address': ticket.place_address,  # Добавляем place_address
-            'created_at': ticket.created_at
+            'place_address': ticket.place_address,
+            'created_at': ticket.created_at,
+            'started_at': ticket.started_at,
+            'completed_at': ticket.completed_at
         } for ticket in tickets]
-        tickets2 = Ticket.query.all()
-        print(f"Заявки, которые будут возвращены: {tickets2}")
+        print(f"Заявки, которые будут возвращены: {result}")
         return jsonify(result)
+        
     except Exception as e:
         print(f"Ошибка при получении заявок: {e}")
         return jsonify({'error': 'Ошибка при получении заявок'}), 500
+
 
 # Создание новой заявки
 @api_bp.route('/tickets', methods=['POST'])
@@ -173,6 +199,7 @@ def create_ticket():
             description=data['description'],
             source=data['source'],
             employee_id=data['employee_id'],
+            status=data['status'],
             client_id=data['client_id'],
             place_id=place_id,  # Записываем place_id
             created_at=datetime.datetime.now().strftime('%m/%d/%y %H:%M:%S')
@@ -279,24 +306,20 @@ def get_client_places(client_id):
 
 @api_bp.route('/tickets/<int:ticket_id>/take', methods=['PATCH'])
 def take_ticket(ticket_id):
-    # Получаем заявку по ID
     ticket = Ticket.query.get(ticket_id)
     if not ticket:
         return jsonify({'message': 'Заявка не найдена'}), 404
 
-    # Проверяем, что заявка еще не в работе
     if ticket.status == 'В работе':
         return jsonify({'message': 'Заявка уже в работе'}), 400
 
-    # Получаем текущего сотрудника из сессии (предполагаем, что это current_user)
-    employee = current_user  # Текущий сотрудник, если он авторизован
-
+    employee = current_user
     if not employee:
         return jsonify({'message': 'Вы не авторизованы'}), 401
 
-    # Обновляем заявку: назначаем сотрудника и меняем статус на "В работе"
     ticket.employee_id = employee.id
     ticket.status = 'В работе'
+    ticket.started_at = datetime.datetime.now().strftime('%m/%d/%y %H:%M:%S')  # Устанавливаем дату завершения
 
     db.session.commit()
 
@@ -306,13 +329,29 @@ def take_ticket(ticket_id):
             'id': ticket.id,
             'title': ticket.title,
             'status': ticket.status,
-            'employee_name': employee.name
+            'employee_name': employee.name,
+            'started_at': ticket.started_at
         }
     })
-@api_bp.route('/clients/<int:client_id>/trade_points', methods=['GET'])
-def get_trade_points(client_id):
-    trade_points = Places.query.filter_by(client_id=client_id).all()
-    return jsonify([{"id": point.id, "name": point.address} for point in trade_points])
+
+@api_bp.route('/tickets/<int:ticket_id>/complete', methods=['PATCH'])
+def complete_ticket(ticket_id):
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket:
+        return jsonify({'error': 'Заявка не найдена'}), 404
+
+    if ticket.status != 'В работе':
+        return jsonify({'error': 'Заявку можно завершить только если она в работе'}), 400
+
+    ticket.status = 'Завершенная'
+    ticket.completed_at = datetime.datetime.now().strftime('%m/%d/%y %H:%M:%S')  # Устанавливаем дату завершения
+
+    db.session.commit()
+    print(f"datetime: {datetime.datetime.now().strftime('%m/%d/%y %H:%M:%S')}")
+    print(f"Время: {ticket.completed_at}")
+    return jsonify({'message': 'Заявка успешно завершена', 'ticket_id': ticket.id, 'completed_at': ticket.completed_at})
+    
+
 
 def send_telegram_notification(telegram_id, message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -336,3 +375,12 @@ def update_employee(id):
     
     db.session.commit()
     return jsonify({'message': 'Заявка обновлена'})
+
+@api_bp.route('/clients/<int:client_id>/trade_points', methods=['GET'])
+def get_trade_points(client_id):
+    places = Places.query.filter_by(client_id=client_id).all()
+    if not places:
+        return jsonify(['dsad']), 404
+
+    trade_points = [{"id": place.id, "name": place.address} for place in places]
+    return jsonify(trade_points)

@@ -5,7 +5,11 @@
 {% block content %}
 <h1 class="mb-4">Система заявок</h1>
 
-<div class="mb-3">
+<!-- Кнопка для отображения меню создания заявки -->
+<button class="btn btn-primary mb-3" onclick="toggleTicketForm()">Создать заявку</button>
+
+<!-- Форма создания заявки (скрыта по умолчанию) -->
+<div id="ticket-form-container" class="mb-3" style="display: none;">
     <h2>Создать новую заявку</h2>
     <form id="ticket-form">
         <div class="mb-3">
@@ -41,6 +45,26 @@
     </form>
 </div>
 
+<!-- Статистика -->
+<div class="mb-3">
+    <h2>Статистика</h2>
+    <p>Нераспределенные заявки: <span id="unassigned-count">0</span></p>
+    <p>Заявки в работе: <span id="in-progress-count">0</span></p>
+    <p>Завершенные заявки: <span id="completed-count">0</span></p>
+</div>
+
+<!-- Фильтр заявок -->
+<div class="mb-3">
+    <label for="ticket-filter">Фильтр:</label>
+    <select id="ticket-filter" class="form-select" onchange="getTickets()">
+        <option value="all">Все заявки</option>
+        <option value="in_progress">В работе</option>
+        <option value="new">Новые</option>
+        <option value="completed">Завершенные</option>
+    </select>
+</div>
+
+<!-- Список заявок -->
 <div class="mb-4">
     <h2>Список заявок</h2>
     <ul id="ticket-list" class="list-group"></ul>
@@ -49,149 +73,127 @@
 
 {% block scripts %}
 <script>
+    function toggleTicketForm() {
+        const formContainer = document.getElementById('ticket-form-container');
+        formContainer.style.display = formContainer.style.display === 'none' ? 'block' : 'none';
+    }
+
     async function getTickets() {
-
-        let url = `/api/tickets`;
-
-        // Добавляем параметры фильтрации
-
-
+        const filter = document.getElementById('ticket-filter').value;
+        let url = `/api/tickets?filter=${filter}`;
         const response = await fetch(url);
         const tickets = await response.json();
         const ticketList = document.getElementById('ticket-list');
         ticketList.innerHTML = '';
-        const currentEmployeeName = "{{ currentEmployeeName }}";  // Flask-переменная передается как строка в JavaScript
-        console.log("from web:",currentEmployeeName);
+
+        let unassignedCount = 0;
+        let inProgressCount = 0;
+        let completedCount = 0;
+
+        const currentEmployeeName = "{{ currentEmployeeName }}";
         
         tickets.forEach(ticket => {
-        console.log("from ticket:", ticket.employee_name)
-        ticketList.innerHTML += `
-            <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span><strong>${ticket.title}</strong> - <strong>Статус:</strong> ${ticket.status}</span>
+            if (ticket.status === 'Завершенная' && !isToday(ticket.completed_at)) return;
+            if (ticket.status === 'Новая') unassignedCount++;
+            if (ticket.status === 'В работе' && ticket.employee_name === currentEmployeeName) inProgressCount++;
+            if (ticket.status === 'Завершенная') completedCount++;
+            
+            if (ticket.status === 'В работе' && ticket.employee_name !== currentEmployeeName) return;
+            
+            ticketList.innerHTML += `
+                <li class="list-group-item ${ticket.status === 'Завершенная' ? 'bg-light text-muted' : ''}">
+                    <strong>${ticket.title}</strong> - <strong>Статус:</strong> ${ticket.status}
+                    <p class="mb-1"><strong>Описание:</strong> ${ticket.description}</p>
+                    <p class="mb-1"><strong>Компания:</strong> ${ticket.company_name}</p>
+                    <p class="mb-1"><strong>Точка продаж:</strong> ${ticket.place_address || 'Не указано'}</p>
+                    <p class="mb-1"><strong>Ответственный сотрудник:</strong> ${ticket.employee_name ? ticket.employee_name : 'Не назначен'}</p>
+                    <small class="text-muted">Создано: ${new Date(ticket.created_at).toLocaleString()}</small>
                     <div>
-                        ${ticket.employee_name === null ? 
-                            
-                            // Если ответственный сотрудник null, показываем кнопки "Взять в работу" и "Удалить"
-                            `<button class="btn btn-sm btn-success me-2" onclick="takeTicket(${ticket.id})">Взять в работу</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteTicket(${ticket.id})">Удалить</button>` :
-                        ticket.employee_name !== currentEmployeeName ? 
-                            // Если заявка у другого сотрудника, показываем только кнопку "Удалить"
-                            `<button class="btn btn-sm btn-danger" onclick="deleteTicket(${ticket.id})">Удалить</button>` :
-                        // Если заявка у текущего сотрудника, показываем кнопки "Изменить" и "Удалить"
-                        
-                        `<button class="btn btn-sm btn-warning me-2" onclick="editTicket(${ticket.id})">Изменить</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTicket(${ticket.id})">Удалить</button>`
-                        }
+                        ${ticket.status === 'В работе' ? `<small class="text-muted">Дата взятия в работу:</strong> ${ticket.started_at}</small><br>` : ''}
+                        ${ticket.status === 'Завершенная' ? `<small class="text-muted">Дата завершения:</strong> ${new Date(ticket.completed_at).toLocaleString()}</small><br>` : ''}
+                        ${ticket.status === 'Новая' ? `<button class="btn btn-sm btn-success me-2" onclick="takeTicket(${ticket.id})">Взять в работу</button>` : ''}
+                        ${ticket.status === 'В работе' ? `<button class="btn btn-sm btn-primary me-2" onclick="completeTicket(${ticket.id})">Завершить заявку</button>` : ''}
+                        ${ticket.status === 'В работе' ? `<button class="btn btn-sm btn-warning me-2" onclick="editTicket(${ticket.id})">Изменить</button>` : ''}
                     </div>
-                </div>
-                <p><strong>Описание:</strong> ${ticket.description}</p>
-                <p><strong>Ответственный сотрудник:</strong> ${ticket.employee_name ? ticket.employee_name : 'Не назначен'}</p>
-                <p><strong>Компания:</strong> ${ticket.company_name}</p>
-                <p><strong>Точка продаж:</strong> ${ticket.place_address || 'Не указано'}</p>
-                <small class="text-muted">Создано: ${new Date(ticket.created_at).toLocaleString()}</small>
-                <div id="edit-form-${ticket.id}" class="mt-3" style="display: none;">
-                    <input type="text" class="form-control mb-2" id="edit-title-${ticket.id}" value="${ticket.title}" placeholder="Название">
-                    <input type="text" class="form-control mb-2" id="edit-description-${ticket.id}" value="${ticket.description}" placeholder="Описание">
-                    <input type="text" class="form-control mb-2" id="edit-status-${ticket.id}" value="${ticket.status}" placeholder="Статус">
-                    <button class="btn btn-sm btn-primary" onclick="saveChanges(${ticket.id})">Сохранить</button>
-                    <button class="btn btn-sm btn-secondary" onclick="cancelEdit(${ticket.id})">Отмена</button>
-                </div>
-            </li>
-        `;
-    });
-
-    }
-
-    async function loadTradePoints() {
-        const clientId = document.getElementById('client').value;
-        const tradePointSelect = document.getElementById('trade_point');  // Исправлено
-        
-        tradePointSelect.innerHTML = '<option value="">Выберите торговую точку</option>';
-        
-        if (!clientId) return;
-        
-        const response = await fetch(`/api/clients/${clientId}/trade_points`);
-        const tradePoints = await response.json();
-        
-        tradePoints.forEach(point => {
-            tradePointSelect.innerHTML += `<option value="${point.id}">${point.name}</option>`;
+                </li>`;
         });
+
+        document.getElementById('unassigned-count').textContent = unassignedCount;
+        document.getElementById('in-progress-count').textContent = inProgressCount;
+        document.getElementById('completed-count').textContent = completedCount;
     }
 
-    async function takeTicket(ticketId) {
-    const response = await fetch(`/api/tickets/${ticketId}/take`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    });
-
-    if (response.ok) {
-        alert('Заявка взята в работу!');
+    async function takeTicket(id) {
+        await fetch(`/api/tickets/${id}/take`, { method: 'PATCH' });
         getTickets();
-    } else {
-        alert('Ошибка при изменении статуса заявки.');
     }
-}
-
-    function editTicket(id) {
-        const editForm = document.getElementById(`edit-form-${id}`);
-        editForm.style.display = 'block';
-    }
-
-    function cancelEdit(id) {
-        const editForm = document.getElementById(`edit-form-${id}`);
-        editForm.style.display = 'none';
-    }
-
-    async function saveChanges(id) {
-        const title = document.getElementById(`edit-title-${id}`).value;
-        const description = document.getElementById(`edit-description-${id}`).value;
-        const status = document.getElementById(`edit-status-${id}`).value;
-
-        const response = await fetch(`/api/tickets/${id}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ title, description, status })
-        });
-
-        if (response.ok) {
-            alert('Заявка обновлена!');
-            getTickets();
-        }
-    }
-
     async function createTicket() {
         const title = document.getElementById('title').value;
         const description = document.getElementById('description').value;
-        const trade_point = document.getElementById('trade_point').value;
-        const employeeId = document.getElementById('employee').value;
+        const placeId = document.getElementById('trade_point').value;  // Получаем выбранную точку продаж
+        const source = "site";
+        const employeeId = document.getElementById('employee').value;  // Можно заменить на динамическое значение
         const clientId = document.getElementById('client').value;
-        const source = 'employee';
+        const status = "В работе";
 
         const response = await fetch('/api/tickets', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ title, description, place_id: trade_point, employee_id: employeeId, client_id: clientId , source: source})
+            body: JSON.stringify({
+                title,
+                description,
+                source,
+                status,
+                employee_id: employeeId,
+                client_id: clientId,
+                place_id: placeId  // Передаем идентификатор точки продаж
+            })
         });
+
         if (response.ok) {
             alert('Заявка создана!');
             getTickets();
         }
     }
+    async function completeTicket(id) {
+        await fetch(`/api/tickets/${id}/complete`, { method: 'PATCH' });
+        getTickets();
+    }
 
-    async function deleteTicket(id) {
-        const response = await fetch(`/api/tickets/${id}`, {
-            method: 'DELETE'
-        });
-        if (response.ok) {
-            alert('Заявка удалена!');
-            getTickets();
+    function editTicket(id) {
+        alert('Редактирование заявки ' + id);
+    }
+
+    function isToday(dateString) {
+        const date = new Date(dateString);
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+    }
+
+    async function loadTradePoints() {
+        const clientId = document.getElementById('client').value;
+        const tradePointSelect = document.getElementById('trade_point');
+        
+        if (!clientId) {
+            tradePointSelect.innerHTML = '<option value="">Выберите торговую точку</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/clients/${clientId}/trade_points`);
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки торговых точек');
+            }
+            const tradePoints = await response.json();
+
+            tradePointSelect.innerHTML = '<option value="">Выберите торговую точку</option>';
+            tradePoints.forEach(point => {
+                tradePointSelect.innerHTML += `<option value="${point.id}">${point.name}</option>`;
+            });
+        } catch (error) {
+            console.error(error);
         }
     }
 
